@@ -2,3 +2,4 @@ astropy
 cchardet
 lxml
 numpy
+pandas
