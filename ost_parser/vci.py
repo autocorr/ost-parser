@@ -128,7 +128,7 @@ class BaseBand:
 
     @property
     def bw(self):
-        """*unit*: Hz"""
+        """**unit**: Hz"""
         return float(self.element.attrib["bw"])
 
     @property
@@ -197,7 +197,7 @@ class SubBand:
 
     @property
     def minIntegTime(self):
-        """*unit*: sec"""
+        """**unit**: sec"""
         min_integ = self.element.polProducts.blbProdIntegration.attrib["minIntegTime"]
         return float(min_integ) * 1e-6  # us to s
 
@@ -214,19 +214,19 @@ class SubBand:
 
     @property
     def inttime(self):
-        """*unit*: sec"""
+        """**unit**: sec"""
         fac = self.integFac
         fac_product = fac["cc"] * fac["lta"] * fac["cbe"]
         return self.minIntegTime * self.recirc * fac_product
 
     @property
     def bw(self):
-        """*unit*: Hz"""
+        """**unit**: Hz"""
         return float(self.element.attrib["bw"])
 
     @property
     def cf(self):
-        """*unit*: Hz"""
+        """**unit**: Hz"""
         return float(self.element.attrib["centralFreq"])
 
     @property
@@ -262,7 +262,7 @@ class SubBand:
     @property
     def freqSamp(self):
         r"""
-        *unit*: Hz
+        **unit**: Hz
         .. math:: f_{samp} = 2 f_{bw}
         """
         return 2 * self.bw
@@ -270,7 +270,7 @@ class SubBand:
     @property
     def freqOpt(self):
         r"""
-        *unit*: Hz
+        **unit**: Hz
         .. math:: f_{opt} = \frac{1.25}{\pi} \sqrt{ \frac{f_{samp}}{\tau} }
         """
         return 1.25 / np.pi * np.sqrt(self.freqSamp / self.inttime)

@@ -142,12 +142,12 @@ class LoIfSetup:
         return v * 1e6  # from MHz to Hz
 
     def freq_from_subband(self, subband):
-        """*unit*: Hz"""
+        """**unit**: Hz"""
         assert self.mode  # invalid for SSLOs
         return self._bb_map[subband.baseband.name]
 
     def sky_freq_from_subband(self, subband):
-        """*unit*: Hz"""
+        """**unit**: Hz"""
         bb_center_freq = self.freq_from_subband(subband)
         bb_bandwidth = subband.baseband.bw
         bb_start_freq = bb_center_freq - bb_bandwidth / 2
@@ -193,7 +193,7 @@ class LoIfOffset:
         return {o.loif: o for o in objs}
 
     def freq_from_subband(self, subband):
-        """*unit*: Hz"""
+        """**unit**: Hz"""
         return self._bb_map[subband.baseband.name]
 
 

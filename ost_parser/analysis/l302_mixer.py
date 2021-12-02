@@ -26,8 +26,6 @@ from enum import Enum
 from dataclasses import dataclass
 from multiprocessing import Pool
 
-from astropy import units as u
-
 from ost_parser.vci import SubBand
 from ost_parser.core import WidarConfig
 
@@ -84,7 +82,7 @@ class SubBandFreqs:
 
     @property
     def f_maxfringe(self):
-        """*unit*: Hz"""
+        """**unit**: Hz"""
         d_scale = self.b_max / 20e3  # m
         f_scale = self.f_sky / 50e9  # Hz
         return 460 * d_scale * f_scale

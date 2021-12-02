@@ -1,4 +1,3 @@
-astropy
 cchardet
 lxml
 numpy
