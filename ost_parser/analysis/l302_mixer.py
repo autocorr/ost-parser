@@ -84,9 +84,10 @@ class SubBandFreqs:
 
     @property
     def f_maxfringe(self):
-        d_scale = self.b_max.to("km").value / 20
-        f_scale = self.f_sky.to("GHz").value / 50
-        return 460 * u.Hz * d_scale * f_scale
+        """*unit*: Hz"""
+        d_scale = self.b_max / 20e3  # m
+        f_scale = self.f_sky / 50e9  # Hz
+        return 460 * d_scale * f_scale
 
     @property
     def f_min(self):

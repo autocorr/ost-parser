@@ -6,8 +6,6 @@ from pathlib import Path
 import numpy as np
 from lxml import (etree, objectify)
 
-from astropy import units as u
-
 
 class VCI:
     p_scan = re.compile(R".+?_scan(\d+)")
@@ -130,8 +128,8 @@ class BaseBand:
 
     @property
     def bw(self):
-        unit = 1 * u.Hz
-        return float(self.element.attrib["bw"]) * unit.to("MHz")
+        """*unit*: Hz"""
+        return float(self.element.attrib["bw"])
 
     @property
     def bb(self):
@@ -165,27 +163,33 @@ class SubBand:
                  "SB "
                 f"sw={self.swIndex:02d} "
                 f"sb={self.sbid:02d} "
-                f"bw={self.bw.value:.1f} "
-                f"cf={self.cf.value:07.3f} "
+                f"bw={self.bw/1e6:.1f} "
+                f"cf={self.cf/1e6:07.3f} "
                 f"nc={self.nchan} "
                 f"np={self.npol} "
                 f"r={self.recirc} "
-                f"t={self.minIntegTime.value:.4f} "
+                f"t={self.minIntegTime:.4f} "
                 f"cc={self.integFac['cc']} "
                 f"lta={self.integFac['lta']} "
                 f"cbe={self.integFac['cbe']} "
-                f"ts={self.inttime.value:.2f} "
+                f"ts={self.inttime:.2f} "
                 f"blbs={self.blbs} "
                 f"{cbeP}"
         )
 
     @property
     def npol(self):
-        return len(self.element.polProducts.pp)
+        try:
+            return len(self.element.polProducts.pp)
+        except AttributeError:
+            return 1
 
     @property
     def nchan(self):
-        return int(self.element.polProducts.pp[0].attrib["spectralChannels"])
+        try:
+            return int(self.element.polProducts.pp[0].attrib["spectralChannels"])
+        except AttributeError:
+            return -1
 
     @property
     def recirc(self):
@@ -193,8 +197,9 @@ class SubBand:
 
     @property
     def minIntegTime(self):
+        """*unit*: sec"""
         min_integ = self.element.polProducts.blbProdIntegration.attrib["minIntegTime"]
-        return float(min_integ) * u.us
+        return float(min_integ) * 1e-6  # us to s
 
     @property
     def integFac(self):
@@ -209,19 +214,20 @@ class SubBand:
 
     @property
     def inttime(self):
+        """*unit*: sec"""
         fac = self.integFac
         fac_product = fac["cc"] * fac["lta"] * fac["cbe"]
-        return (self.minIntegTime * self.recirc * fac_product).to("s")
+        return self.minIntegTime * self.recirc * fac_product
 
     @property
     def bw(self):
-        unit = 1 * u.Hz
-        return float(self.element.attrib["bw"]) * unit.to("MHz")
+        """*unit*: Hz"""
+        return float(self.element.attrib["bw"])
 
     @property
     def cf(self):
-        unit = 1 * u.Hz
-        return float(self.element.attrib["centralFreq"]) * unit.to("MHz")
+        """*unit*: Hz"""
+        return float(self.element.attrib["centralFreq"])
 
     @property
     def swIndex(self):
@@ -256,17 +262,18 @@ class SubBand:
     @property
     def freqSamp(self):
         r"""
-        .. math::
-            f_{samp} = 2 f_{bw}
+        *unit*: Hz
+        .. math:: f_{samp} = 2 f_{bw}
         """
         return 2 * self.bw
 
     @property
     def freqOpt(self):
         r"""
+        *unit*: Hz
         .. math:: f_{opt} = \frac{1.25}{\pi} \sqrt{ \frac{f_{samp}}{\tau} }
         """
-        return 1.25 / np.pi * np.sqrt(self.freqSamp / self.inttime).to("Hz")
+        return 1.25 / np.pi * np.sqrt(self.freqSamp / self.inttime)
 
 
 def print_summary(filen):

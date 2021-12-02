@@ -8,8 +8,7 @@ from dataclasses import dataclass
 
 import cchardet
 import pandas as pd
-
-from astropy import units as u
+from pandas import IndexSlice as idx
 
 from ost_parser import OST_ROOT
 from ost_parser.vci import (VCI, BaseBand, SubBand)
@@ -32,10 +31,10 @@ class ParseError(RuntimeError):
 
 class EvlaFile:
     config_max_baselines = {
-            "A": 36.40 * u.km,
-            "B": 11.10 * u.km,
-            "C":  3.40 * u.km,
-            "D":  1.03 * u.km,
+            "A": 36400.,  # m
+            "B": 11100.,
+            "C":  3400.,
+            "D":  1030.,
     }
     p_oldstyle = re.compile(R"loif\d+ = LoIfSetup")
     p_array_conf = re.compile(R"#   Array Configurations: (.+?)\n")
@@ -108,9 +107,19 @@ class LoIfSetup:
         self.bb_bd1 = self.parse_frequency(group[5])
         self.bb_bd2 = self.parse_frequency(group[6])
         self.flag   = int(group[7])
-        self.is_8bit = self.bb_ac2 + self.bb_bd2 == 0.0 * u.MHz
+        self.is_8bit = self.bb_ac2 + self.bb_bd2 == 0.0
         self.is_3bit = not self.is_8bit
         self.uses_offset = any([self.offset_str in g for g in group[3:7]])
+        self._bb_map = {
+                # 8-bit
+                "A0/C0": self.bb_ac1,
+                "B0/D0": self.bb_bd1,
+                # 3-bit
+                "A1/C1": self.bb_ac1,
+                "A2/C2": self.bb_ac2,
+                "B1/D1": self.bb_bd1,
+                "B2/D2": self.bb_bd2,
+        }
 
     @classmethod
     def from_evla_text(cls, efile):
@@ -130,23 +139,15 @@ class LoIfSetup:
             )
         else:
             v = float(s)
-        return v * u.MHz
+        return v * 1e6  # from MHz to Hz
 
     def freq_from_subband(self, subband):
+        """*unit*: Hz"""
         assert self.mode  # invalid for SSLOs
-        bb_map = {
-                # 8-bit
-                "A0/C0": self.bb_ac1,
-                "B0/D0": self.bb_bd1,
-                # 3-bit
-                "A1/C1": self.bb_ac1,
-                "A2/C2": self.bb_ac2,
-                "B1/D1": self.bb_bd1,
-                "B2/D2": self.bb_bd2,
-        }
-        return bb_map[subband.baseband.name]
+        return self._bb_map[subband.baseband.name]
 
     def sky_freq_from_subband(self, subband):
+        """*unit*: Hz"""
         bb_center_freq = self.freq_from_subband(subband)
         bb_bandwidth = subband.baseband.bw
         bb_start_freq = bb_center_freq - bb_bandwidth / 2
@@ -167,10 +168,20 @@ class LoIfOffset:
     def __init__(self, group):
         self.ix   = int(group[0])
         self.loif = f"loif{group[0]}"
-        self.df_ac1 = float(group[1]) * u.MHz
-        self.df_bd1 = float(group[2]) * u.MHz
-        self.df_ac2 = float(group[3]) * u.MHz
-        self.df_bd2 = float(group[4]) * u.MHz
+        self.df_ac1 = float(group[1]) * 1e6  # from MHz to Hz
+        self.df_bd1 = float(group[2]) * 1e6
+        self.df_ac2 = float(group[3]) * 1e6
+        self.df_bd2 = float(group[4]) * 1e6
+        self._bb_map = {
+                # 8-bit
+                "A0/C0": self.df_ac1,
+                "B0/D0": self.df_bd1,
+                # 3-bit
+                "A1/C1": self.df_ac1,
+                "A2/C2": self.df_ac2,
+                "B1/D1": self.df_bd1,
+                "B2/D2": self.df_bd2,
+        }
 
     @classmethod
     def from_evla_text(cls, efile):
@@ -182,17 +193,8 @@ class LoIfOffset:
         return {o.loif: o for o in objs}
 
     def freq_from_subband(self, subband):
-        bb_map = {
-                # 8-bit
-                "A0/C0": self.df_ac1,
-                "B0/D0": self.df_bd1,
-                # 3-bit
-                "A1/C1": self.df_ac1,
-                "A2/C2": self.df_ac2,
-                "B1/D1": self.df_bd1,
-                "B2/D2": self.df_bd2,
-        }
-        return bb_map[subband.baseband.name]
+        """*unit*: Hz"""
+        return self._bb_map[subband.baseband.name]
 
 
 class EvlaScan:
@@ -325,23 +327,52 @@ class Execution:
             offset = self.loif_offsets[loif_name]
             yield loif_name, setup, offset
 
-    def to_pandas(self, all_scans=True):
-        """
-        Parameters
-        ----------
-        all_scans : bool, default True
-            Export all scans. If False, only export first scan for an LOIF
-            setup.
-        """
-        if all_scans:
-            configs = self.configs_by_scan.values()
-        else:
-            configs = (ws[0] for ws in self.configs_by_loif.values())
-        # scan inform
-        # setup
-        # offset
-        # values for each sub-band
-        pass
+    def to_pandas(self):
+        configs = [ws[0] for ws in self.configs_by_loif.values()]
+        ex_items = [
+                (config, baseband, subband)
+                for config in configs
+                for baseband in config.vci
+                for subband in baseband
+        ]
+        cf, bb, sb = list(map(list, zip(*ex_items)))  # transpose
+        col_data = {
+                "label":          [self.label for _ in sb],
+                "lo_ix":          [c.loif_setup.ix for c in cf],
+                "bb_ix":          [b.name for b in bb],
+                "sb_ix":          [s.sbid for s in sb],
+                "max_baseline":   [self.efile.max_baseline for _ in sb],
+                "lo_mode":        [c.loif_setup.mode for c in cf],
+                "lo_flag":        [c.loif_setup.flag for c in cf],
+                "rcvr":           [c.loif_setup.rcvr for c in cf],
+                "bb_bw":          [b.bw for b in bb],
+                "in_quant":       [b.inQuant for b in bb],
+                "is_8bit":        [int(b.is_8bit) for b in bb],
+                "npol":           [s.npol for s in sb],
+                "nchan":          [s.nchan for s in sb],
+                "recirc":         [s.recirc for s in sb],
+                "min_integ_time": [s.minIntegTime for s in sb],
+                "int_time":       [s.inttime for s in sb],
+                "sb_bw":          [s.bw for s in sb],
+                "sb_cf":          [s.cf for s in sb],
+                "nblb":           [s.nblb for s in sb],
+                "f_samp":         [s.freqSamp for s in sb],
+                "f_opt":          [s.freqOpt for s in sb],
+                "f_sky": [
+                        c.loif_setup.sky_freq_from_subband(s)
+                        for c, s in zip(cf, sb)
+                ],
+                "f_shift": [
+                        c.loif_offset.freq_from_subband(s)
+                        for c, s in zip(cf, sb)
+                ],
+                "bb_cf": [
+                        c.loif_setup.freq_from_subband(s)
+                        for c, s in zip(cf, sb)
+                ],
+        }
+        df = pd.DataFrame(col_data)
+        return df
 
 
 def parse_exec_if_valid(path, console_out=False):
@@ -370,5 +401,17 @@ def read_all_executions(nproc=1):
     else:
         execs = [parse_exec_if_valid(p) for p in paths]
     return [ex for ex in execs if ex is not None]
+
+
+def execs_to_df(execs, nproc=1):
+    assert nproc > 0
+    if nproc > 1:
+        with Pool(processes=nproc) as pool:
+            all_dfs = pool.map(Execution.to_pandas, execs)
+    else:
+        all_dfs = [ex.to_pandas() for ex in execs]
+    merged = pd.concat(all_dfs)
+    merged.set_index(["label", "lo_ix", "bb_ix", "sb_ix"], inplace=True)
+    return merged
 
 

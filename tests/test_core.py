@@ -31,6 +31,9 @@ class TestExecution:
         assert core.Execution.from_str("2021/01/97920B-310A")
         assert core.Execution.from_str("2021", "01", "97920B-310A")
 
+    def test_pandas(self, f_ex):
+        assert not f_ex.to_pandas().empty
+
     def test_sampler(self, f_ex):
         bb = f_ex.configs_by_scan[3].vci[0]
         assert bb.is_8bit
@@ -101,10 +104,10 @@ class TestExecution:
     def test_tuning_offset_75MHz(self):
         ex = core.Execution.from_str("2012", "11", "98012B-394A")
         setup = ex.configs_by_scan[1].loif_setup
-        assert np.isclose(setup.bb_ac1.value, 236.0)
-        assert np.isclose(setup.bb_ac2.value,   0.0)
-        assert np.isclose(setup.bb_bd1.value, 150.0)
-        assert np.isclose(setup.bb_bd2.value,   0.0)
+        assert np.isclose(setup.bb_ac1, 236.0e6)
+        assert np.isclose(setup.bb_ac2,   0.0e6)
+        assert np.isclose(setup.bb_bd1, 150.0e6)
+        assert np.isclose(setup.bb_bd2,   0.0e6)
 
 
 def test_parse_exec_if_valid():
