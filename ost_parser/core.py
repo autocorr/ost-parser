@@ -43,6 +43,8 @@ class EvlaFile:
     }
     p_oldstyle = re.compile(R"loif\d+ = LoIfSetup")
     p_array_conf = re.compile(R"#   Array Configurations: (.+?)\n")
+    p_project = re.compile(R"# EVLA PROJECT (.+?), DB ID (\d+?)\n")
+    p_mjd = re.compile(R"#   Assumed Script Start: .+?MJD ([\.\d]+?)\)\n")
 
     def __init__(self, path):
         with path.open("rb") as f:
@@ -55,6 +57,16 @@ class EvlaFile:
         self.has_scan_loop = "for iter1 in range" in self.text
         self.max_config = self.parse_max_config(text)
         self.max_baseline = self.config_max_baselines[self.max_config]
+        # Extract project information
+        try:
+            self.code, self.dbid = self.p_project.search(text).groups()
+        except AttributeError:
+            raise ParseError("Could not parse project code information.")
+        # Extract start MJD
+        try:
+            self.mjd = float(self.p_mjd.search(text).groups()[0])
+        except AttributeError:
+            raise ParseError("Could not parse assumed MJD start.")
 
     @property
     def newstyle(self):
@@ -355,6 +367,11 @@ class Execution:
         cf, bb, sb = list(map(list, zip(*ex_items)))  # transpose
         col_data = {
                 "label":          [self.label for _ in sb],
+                "year":           [self.year for _ in sb],
+                "month":          [self.month for _ in sb],
+                "code":           [self.efile.code for _ in sb],
+                "dbid":           [self.efile.dbid for _ in sb],
+                "mjd":            [self.efile.mjd for _ in sb],
                 "lo_ix":          [c.loif_setup.ix for c in cf],
                 "bb_ix":          [b.name for b in bb],
                 "sb_ix":          [s.swIndex for s in sb],
