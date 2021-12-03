@@ -14,6 +14,11 @@ from ost_parser import OST_ROOT
 from ost_parser.vci import (VCI, BaseBand, SubBand)
 
 
+KNOWN_INVALID = [
+        "53714A-242A",  # 2014/06/
+]
+
+
 def check_all_encodings():
     paths = sorted(OST_ROOT.glob("????/??/*-*/*.evla"))
     encodings = {}
@@ -327,20 +332,33 @@ class Execution:
             offset = self.loif_offsets[loif_name]
             yield loif_name, setup, offset
 
-    def to_pandas(self):
+    def iter_valid_unique_subbands(self):
         configs = [ws[0] for ws in self.configs_by_loif.values()]
-        ex_items = [
-                (config, baseband, subband)
-                for config in configs
-                for baseband in config.vci
-                for subband in baseband
-        ]
+        for config in configs:
+            for baseband in config.vci:
+                for subband in baseband:
+                    if subband.is_valid:
+                        yield config, baseband, subband
+
+    @property
+    def all_invalid(self):
+        try:
+            next(self.iter_valid_unique_subbands())
+            return False
+        except StopIteration:
+            return True
+
+    def to_pandas(self):
+        ex_items = list(self.iter_valid_unique_subbands())
+        if not ex_items:
+            raise ParseError("No valid subbands.")
         cf, bb, sb = list(map(list, zip(*ex_items)))  # transpose
         col_data = {
                 "label":          [self.label for _ in sb],
                 "lo_ix":          [c.loif_setup.ix for c in cf],
                 "bb_ix":          [b.name for b in bb],
-                "sb_ix":          [s.sbid for s in sb],
+                "sb_ix":          [s.swIndex for s in sb],
+                "max_config":     [self.efile.max_config for _ in sb],
                 "max_baseline":   [self.efile.max_baseline for _ in sb],
                 "lo_mode":        [c.loif_setup.mode for c in cf],
                 "lo_flag":        [c.loif_setup.flag for c in cf],
@@ -375,7 +393,17 @@ class Execution:
         return df
 
 
+def get_program_paths(exclude_tests=True):
+    paths = sorted(OST_ROOT.glob("????/??/*"))
+    if exclude_tests:
+        paths = [p for p in paths if "-" in p.name]
+    return paths
+
+
 def parse_exec_if_valid(path, console_out=False):
+    if path.name in KNOWN_INVALID:
+        warnings.warn(f"Parse error: known invalid: {path}")
+        return
     try:
         if console_out:
             print(f"-- {path}")
@@ -383,13 +411,7 @@ def parse_exec_if_valid(path, console_out=False):
         return ex
     except ParseError as e:
         warnings.warn(f"{e}")
-
-
-def get_program_paths(exclude_tests=True):
-    paths = sorted(OST_ROOT.glob("????/??/*"))
-    if exclude_tests:
-        paths = [p for p in paths if "-" in p.name]
-    return paths
+        return
 
 
 def read_all_executions(nproc=1):

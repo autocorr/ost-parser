@@ -109,6 +109,18 @@ class TestExecution:
         assert np.isclose(setup.bb_bd1, 150.0e6)
         assert np.isclose(setup.bb_bd2,   0.0e6)
 
+    def test_all_subbands_invalid(self):
+        ex = core.Execution.from_str("2014", "06", "53714A-242A")
+        assert ex.all_invalid
+
+
+def test_get_program_paths():
+    n_tests = core.get_program_paths(exclude_tests=True)
+    y_tests = core.get_program_paths(exclude_tests=False)
+    assert len(n_tests) > 0
+    assert len(y_tests) > 0
+    assert len(n_tests) < len(y_tests)
+
 
 def test_parse_exec_if_valid():
     assert core.parse_exec_if_valid(TEST_PATH)

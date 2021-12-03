@@ -239,8 +239,12 @@ class SubBand:
 
     @property
     def blbs(self):
+        try:
+            blb_pairs = self.element.polProducts.blbPair
+        except AttributeError:
+            return []
         blblist = []
-        for b in self.element.polProducts.blbPair:
+        for b in blb_pairs:
             n = int(b.attrib["numBlbPairs"])
             q = int(b.attrib["quadrant"])
             p0 = int(b.attrib["firstBlbPair"])
@@ -274,6 +278,10 @@ class SubBand:
         .. math:: f_{opt} = \frac{1.25}{\pi} \sqrt{ \frac{f_{samp}}{\tau} }
         """
         return 1.25 / np.pi * np.sqrt(self.freqSamp / self.inttime)
+
+    @property
+    def is_valid(self):
+        return self.swIndex != -1 and len(self.blbs) > 0
 
 
 def print_summary(filen):

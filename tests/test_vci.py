@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
 import pytest
+import numpy as np
 
 from . import TEST_VCI
 from ost_parser import vci
+from ost_parser import core
 
 
 @pytest.fixture
@@ -52,5 +54,15 @@ def test_subband(f_sb):
     assert f_sb.blbs
     assert f_sb.blbs
     assert f_sb.nblb
+
+
+def test_invalid_subband():
+    ex = core.Execution.from_str("2015/03/82013B-266A")
+    sb = ex.configs_by_scan[1].vci[1][0]
+    assert sb.swIndex == 2
+    assert sb.npol == 4
+    assert np.isclose(sb.bw, 128000000.)
+    assert sb.nblb == 0
+    assert not sb.is_valid
 
 
