@@ -99,11 +99,11 @@ class EvlaFile:
 class LoIfSetup:
     p_old = re.compile(
             R"loif(\d+) = "
-            R"LoIfSetup\((\S+?),(\S+?),(\S+?),(\S+?),(\S+?),(\S+?),(\S+?)\)"
+            R'LoIfSetup\((\S+?),"(\S+?)",(\S+?),(\S+?),(\S+?),(\S+?),(\S+?)\)'
             )
     p_new = re.compile(
             R"loifs\['loif(\d+)'\] = "
-            R"LoIfSetup\((\S+?),(\S+?),(\S+?),(\S+?),(\S+?),(\S+?),(\S+?)\)"
+            R'LoIfSetup\((\S+?),"(\S+?)",(\S+?),(\S+?),(\S+?),(\S+?),(\S+?)\)'
     )
     p_offset = re.compile(R"tuningOffsetMHz\s?=\s?([-\d\.e]+)")
     offset_str = "tuningOffsetMHz"
