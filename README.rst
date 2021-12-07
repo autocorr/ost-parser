@@ -8,9 +8,9 @@ on properties of historical EVLA observations (from Jan 2011 onward).
 To run the test suite, pass the project repository directory name to ``pytest``
 on a host where the OST files are present (``/home/mchost/evla/scripts/ost``):
 
-.. code:: python
+.. code::
 
-   pytest oster-parser
+   $ pytest oster-parser
 
 
 License
