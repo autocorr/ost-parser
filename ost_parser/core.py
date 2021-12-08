@@ -218,38 +218,64 @@ class EvlaScan:
     p_loif_old = re.compile(R"\s*subarray\.setLoIfSetup\(loif(\d+)\)")
     p_loif_new = re.compile(R"\s*loifName = 'loif(\d+)'")
     p_scan = re.compile(R"\s*# Scan num\. (\d+), '(.*?)', DB ID (\d+)")
+    p_time = re.compile(R"\s*# Approx sidereal time: total = (\d+)s, slew = (\d+)s, on source = (\d+)s")
+    p_intent = re.compile(R"""\s*intents\.addIntent\('ScanIntent="(.+?)"'\)""")
 
     def __init__(self, group):
         self.ix     = int(group[0])
         self.field  = group[1]
         self.db_id  = int(group[2])
         self.loif   = f"loif{group[3]}"
+        self.t_total = float(group[4][0])
+        self.t_slew  = float(group[4][1])
+        self.t_onsrc = float(group[4][2])
+        self.intents = group[5].split()
 
     @classmethod
     def from_evla_text(cls, efile):
         p_loif = cls.p_loif_old if efile.oldstyle else cls.p_loif_new
         lines = efile.text.split("\n")
-        loif_last = "None"
+        loif = "NULL"
+        intents = "NULL"
         scans = []
         for i, line in enumerate(lines):
+            # Identify a scan block from the comment "# Scan num. 1 ..."
+            # If no match is found, then continue on to the next line in the
+            # file.
             try:
                 ix, field, db_id = cls.p_scan.match(line).groups()
             except AttributeError:
                 continue
+            # The scan comment is always followed by the "# Approx sidereal..."
+            # line with time information.
+            try:
+                times = cls.p_time.match(lines[i+1]).groups()
+            except AttributeError:
+                raise ParseError("Could not parse times.")
+            # If the intents change, then the next line will set the "ScanIntent"
+            # attribute to the intents. Note: "addIntent" is really more of a
+            # setter method to the underlying Java class, not an append operation.
+            try:
+                intents = cls.p_intent.match(lines[i+2]).groups()[0]
+            except AttributeError:
+                pass
+            if intents == "NULL":
+                raise ParseError("Invalid addIntent convention.")
+            # If a new scan block appears (with a blank line) before the
+            # LOIF setting is changed, then the LOIF settings are re-used
+            # from the last scan.
             for peek in lines[i:]:
                 if peek.strip() == "":  # blank line after block
-                    loif = loif_last
                     break
                 m_loif = p_loif.match(peek)
                 if m_loif:
                     loif = m_loif[1]
-                    loif_last = loif
                     break
             else:
                 raise ParseError("Invalid loifName/loifCounts convention.")
-            if loif == "None":
+            if loif == "NULL":
                 raise ParseError("Invalid loifName/loifCounts convention.")
-            items = (ix, field, db_id, loif)
+            items = (ix, field, db_id, loif, times, intents)
             scans.append(cls(items))
         return scans
 
