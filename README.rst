@@ -10,7 +10,7 @@ on a host where the OST files are present (``/home/mchost/evla/scripts/ost``):
 
 .. code::
 
-   $ pytest oster-parser
+   $ pytest ost-parser
 
 
 License
